@@ -52,8 +52,8 @@ export default function LogoGenerator() {
         body: JSON.stringify(buildPayload(cfg)),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Request failed' })) as { error?: string };
-        setError(data.error ?? 'Request failed');
+        const errData = await res.json().catch(() => ({})) as { error?: string };
+        setError(errData.error ?? 'Request failed');
         return;
       }
       const svgText = await res.text();
@@ -198,24 +198,34 @@ export default function LogoGenerator() {
 
           {/* Preview */}
           <div className="flex-1 px-8 py-6 flex flex-col items-center justify-center bg-gray-50">
-            <p className="text-sm font-medium text-gray-700 mb-4">Preview</p>
-            <div className="w-48 h-48 flex items-center justify-center bg-white rounded-xl border border-gray-200 shadow-sm">
-              {loading && !previewUrl && (
-                <div className="text-gray-400 text-sm">Loading...</div>
+            <div className="flex items-center gap-2 mb-4">
+              <p className="text-sm font-medium text-gray-700">Preview</p>
+              {loading && (
+                <span className="text-xs text-gray-400 animate-pulse">Updating…</span>
               )}
-              {error && (
-                <div className="text-red-500 text-xs text-center px-2">{error}</div>
+            </div>
+            <div className="w-48 h-48 flex items-center justify-center bg-white rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+              {/* Show placeholder on very first load before any URL is set */}
+              {!previewUrl && !error && (
+                <div className="text-gray-400 text-sm">Loading…</div>
               )}
-              {previewUrl && !error && (
+              {/* Keep previous image visible while loading or on error */}
+              {previewUrl && (
                 /* Using <img> with blob URL to sandbox SVG script execution */
                 <img
                   src={previewUrl}
                   alt="Logo preview"
-                  className="w-full h-full object-contain rounded-xl"
+                  className={`w-full h-full object-contain rounded-xl transition-opacity duration-150 ${loading ? 'opacity-50' : 'opacity-100'}`}
                 />
               )}
+              {error && !previewUrl && (
+                <div className="text-red-500 text-xs text-center px-2">{error}</div>
+              )}
             </div>
-            {previewUrl && (
+            {error && (
+              <p className="text-xs text-red-500 mt-2 text-center max-w-[12rem]">{error}</p>
+            )}
+            {previewUrl && !error && (
               <p className="text-xs text-gray-400 mt-3">128 × 128 px</p>
             )}
           </div>
