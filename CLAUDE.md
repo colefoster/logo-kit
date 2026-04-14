@@ -45,6 +45,17 @@ These issues have occurred before — avoid repeating them:
 - **rejection**: The LogoGenerator.tsx UI changes are solid polish — keeping the previous preview visible while loading, showing an 'Updating…' indicator, and improving error display. However, a large build artifact was committed.
 [medium] `tsconfig.tsbuildinfo` is a TypeScript incremental build cache file and should not be committed. It's a build artifact that changes on every compilation and adds noise to the repo. Add it to `.gitignore` and remove it from the commit.
 [low] When `error` is truthy AND `previewUrl` is set, the error message now renders below the preview (`<p>` tag at line ~228) while the old preview image remains visible. This is reasonable UX, but consider whether showing a stale preview alongside an error could confuse users — e.g., if the error is about an invalid config, the preview still shows the last valid result with no visual indication it's outdated (only the dim loading state, which clears when loading finishes with an error).
+- **rejection**: The diff does not contain any changes that would fix a build failure. It consists of (1) a CLAUDE.md documentation rewrite and (2) a new health check route at /up. Neither addresses TypeScript compilation errors, broken imports, or missing modules — the stated acceptance criteria. The health check route addition is fine on its own, but it's a feature, not a build fix.
+[high] Acceptance criteria not met: The diff contains no code changes that fix a build failure. There are no TypeScript error fixes, no import corrections, and no module resolutions. The CLAUDE.md changes are documentation-only and cannot affect the build. If the build was genuinely broken, the fix is missing from this diff; if it wasn't broken, the commit message and task framing are misleading.
+[medium] Duplicate health check routes: Both `app/api/up/route.ts` and the new `app/up/route.ts` exist with identical code. This serves `/api/up` and `/up` respectively. If the monitoring URL is `/up`, the old `/api/up` route is now dead code and should be removed to avoid confusion. Conversely, if both are needed, document why.
+[medium] `tsconfig.tsbuildinfo` is still missing from `.gitignore`. A prior review rejection specifically flagged this build artifact as something that should not be committed. This diff was the right place to add `*.tsbuildinfo` to `.gitignore`.
+[low] CLAUDE.md cleanup is good but loses some useful context (e.g., security requirements details, config schema documentation, deployment notes). While the new version is more concise, verify that critical operational knowledge isn't lost — particularly the security sanitization requirements and the Docker deployment details.
 
 ## Learned Patterns
+- [dependency_vulnerability] Logo Kit has vulnerable dependencies (npm): npm warn config production Use `--omit=dev` instead.
+npm error code ENOLOCK
+npm error audit This command requires an existing lockfile.
+npm error audit Try creating one first with: npm i --package-lock-only
+npm error audit Original error: loadVirtual requires existing shrinkwrap file
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-04-14T23_02_17_118Z-debug-0.log
 - [health_failure] Logo Kit health check failed: HTTP 404 from https://logo-kit.fostered.dev/up

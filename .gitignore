@@ -30,3 +30,6 @@ npm-debug.log*
 
 # Generated output
 output/
+
+# TypeScript build cache
+*.tsbuildinfo
