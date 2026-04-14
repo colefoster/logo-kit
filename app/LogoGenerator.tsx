@@ -34,6 +34,8 @@ const DEFAULT_CONFIG: Config = {
   fontSize: '',
 };
 
+const MAX_DROPDOWN_ITEMS = 50;
+
 export default function LogoGenerator() {
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -42,6 +44,30 @@ export default function LogoGenerator() {
   const [downloading, setDownloading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobRef = useRef<string>('');
+
+  // Icon picker state
+  const [icons, setIcons] = useState<string[]>([]);
+  const [iconsLoading, setIconsLoading] = useState(true);
+  const [iconsError, setIconsError] = useState('');
+  const [iconQuery, setIconQuery] = useState(DEFAULT_CONFIG.icon);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Fetch icon list once on mount
+  useEffect(() => {
+    fetch('/api/icons')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load icons');
+        return res.json() as Promise<{ icons: string[] }>;
+      })
+      .then((data) => {
+        setIcons(data.icons);
+        setIconsLoading(false);
+      })
+      .catch(() => {
+        setIconsError('Failed to load icon list');
+        setIconsLoading(false);
+      });
+  }, []);
 
   const fetchPreview = useCallback(async (cfg: Config) => {
     setLoading(true);
@@ -98,6 +124,23 @@ export default function LogoGenerator() {
   function update(field: keyof Config, value: string) {
     setConfig((prev) => ({ ...prev, [field]: value }));
   }
+
+  function handleIconQueryChange(value: string) {
+    setIconQuery(value);
+    update('icon', value);
+    setDropdownOpen(true);
+  }
+
+  function selectIcon(name: string) {
+    setIconQuery(name);
+    update('icon', name);
+    setDropdownOpen(false);
+  }
+
+  const filteredIcons = icons.filter((icon) =>
+    icon.includes(iconQuery.toLowerCase())
+  );
+  const displayedIcons = filteredIcons.slice(0, MAX_DROPDOWN_ITEMS);
 
   async function handleDownload() {
     setDownloading(true);
@@ -184,22 +227,60 @@ export default function LogoGenerator() {
               </select>
             </div>
 
-            {/* Icon (only when type is "icon") */}
+            {/* Icon picker (only when type is "icon") */}
             {config.type === 'icon' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Icon Name
                 </label>
-                <input
-                  type="text"
-                  value={config.icon}
-                  onChange={(e) => update('icon', e.target.value)}
-                  placeholder="star"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Lucide icon name (e.g. star, zap, heart, code)
-                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={iconQuery}
+                    onChange={(e) => handleIconQueryChange(e.target.value)}
+                    onFocus={() => setDropdownOpen(true)}
+                    onBlur={() => setDropdownOpen(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') setDropdownOpen(false);
+                    }}
+                    placeholder={iconsLoading ? 'Loading icons…' : 'Search icons…'}
+                    disabled={iconsLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+                  />
+                  {iconsError && (
+                    <p className="text-xs text-red-500 mt-1">{iconsError}</p>
+                  )}
+                  {dropdownOpen && !iconsLoading && !iconsError && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                      <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
+                        {filteredIcons.length === 0
+                          ? 'No matching icons'
+                          : filteredIcons.length <= MAX_DROPDOWN_ITEMS
+                          ? `${filteredIcons.length} icon${filteredIcons.length === 1 ? '' : 's'}`
+                          : `${MAX_DROPDOWN_ITEMS} of ${filteredIcons.length} icons`}
+                      </div>
+                      <ul className="max-h-48 overflow-y-auto">
+                        {displayedIcons.map((icon) => (
+                          <li key={icon}>
+                            <button
+                              type="button"
+                              // mousedown fires before blur, so we can select without closing dropdown first
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                selectIcon(icon);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm font-mono hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${
+                                icon === config.icon ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700'
+                              }`}
+                            >
+                              {icon}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
