@@ -39,6 +39,7 @@ export default function LogoGenerator() {
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobRef = useRef<string>('');
 
@@ -96,6 +97,29 @@ export default function LogoGenerator() {
 
   function update(field: keyof Config, value: string) {
     setConfig((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(config)),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = res.headers.get('Content-Disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      a.download = match ? match[1] : 'logo-kit.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
@@ -228,6 +252,13 @@ export default function LogoGenerator() {
             {previewUrl && !error && (
               <p className="text-xs text-gray-400 mt-3">128 × 128 px</p>
             )}
+            <button
+              onClick={handleDownload}
+              disabled={!previewUrl || !!error || downloading}
+              className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {downloading ? 'Downloading…' : 'Download Kit'}
+            </button>
           </div>
         </div>
       </div>

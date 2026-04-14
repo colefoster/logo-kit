@@ -50,6 +50,10 @@ These issues have occurred before — avoid repeating them:
 [medium] Duplicate health check routes: Both `app/api/up/route.ts` and the new `app/up/route.ts` exist with identical code. This serves `/api/up` and `/up` respectively. If the monitoring URL is `/up`, the old `/api/up` route is now dead code and should be removed to avoid confusion. Conversely, if both are needed, document why.
 [medium] `tsconfig.tsbuildinfo` is still missing from `.gitignore`. A prior review rejection specifically flagged this build artifact as something that should not be committed. This diff was the right place to add `*.tsbuildinfo` to `.gitignore`.
 [low] CLAUDE.md cleanup is good but loses some useful context (e.g., security requirements details, config schema documentation, deployment notes). While the new version is more concise, verify that critical operational knowledge isn't lost — particularly the security sanitization requirements and the Docker deployment details.
+- **rejection**: The diff adds *.tsbuildinfo to .gitignore and removes tsconfig.tsbuildinfo from tracking, which is good. However, it only partially meets the acceptance criteria — .next/ and next-env.d.ts are missing from .gitignore and not removed from git tracking. The CLAUDE.md changes are documentation updates that weren't requested.
+[high] Acceptance criteria not fully met: .gitignore is missing entries for `.next/` and `next-env.d.ts`. The criteria explicitly require all three: tsconfig.tsbuildinfo, .next/, and next-env.d.ts.
+[high] Acceptance criteria not fully met: `next-env.d.ts` was not removed from git tracking (no `git rm --cached next-env.d.ts` evidence in the diff). The criteria require both files to be untracked.
+[medium] Acceptance criteria violated: 'No other files are modified' — but CLAUDE.md was modified with documentation additions. While the CLAUDE.md changes are reasonable on their own, they fall outside the stated scope.
 
 ## Learned Patterns
 - [dependency_vulnerability] Logo Kit has vulnerable dependencies (npm): npm warn config production Use `--omit=dev` instead.
