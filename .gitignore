@@ -33,3 +33,9 @@ output/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Vercel
+.vercel
+
+# Package tarballs
+*.tgz
