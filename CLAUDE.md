@@ -54,6 +54,12 @@ These issues have occurred before — avoid repeating them:
 [high] Acceptance criteria not fully met: .gitignore is missing entries for `.next/` and `next-env.d.ts`. The criteria explicitly require all three: tsconfig.tsbuildinfo, .next/, and next-env.d.ts.
 [high] Acceptance criteria not fully met: `next-env.d.ts` was not removed from git tracking (no `git rm --cached next-env.d.ts` evidence in the diff). The criteria require both files to be untracked.
 [medium] Acceptance criteria violated: 'No other files are modified' — but CLAUDE.md was modified with documentation additions. While the CLAUDE.md changes are reasonable on their own, they fall outside the stated scope.
+- **rejection**: The diff only adds .vercel and *.tgz to .gitignore. It does not add .next/ or next-env.d.ts entries, and there is no evidence that tsconfig.tsbuildinfo or next-env.d.ts were removed from git tracking via `git rm --cached`. The acceptance criteria are largely unmet.
+[high] .gitignore is missing entries for `.next/` and `next-env.d.ts`. The acceptance criteria explicitly require both.
+[high] No evidence that `next-env.d.ts` was removed from git tracking (`git rm --cached next-env.d.ts`). The acceptance criteria require `git ls-files next-env.d.ts` to return empty.
+[high] No evidence that `tsconfig.tsbuildinfo` was removed from git tracking (`git rm --cached tsconfig.tsbuildinfo`). The *.tsbuildinfo glob was already in .gitignore from a prior commit, but if the file is still tracked, the gitignore entry has no effect. The diff should include the `git rm --cached` step.
+[low] The `node_modules/` entry is listed in acceptance criteria but not added in this diff. It may already exist in .gitignore (the diff context doesn't show the full file), so this is only an issue if it's actually missing.
+[low] The `.env*` entry is listed in acceptance criteria but not added. Same caveat — may already be present.
 
 ## Learned Patterns
 - [dependency_vulnerability] Logo Kit has vulnerable dependencies (npm): npm warn config production Use `--omit=dev` instead.
