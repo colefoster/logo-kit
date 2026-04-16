@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 
-const MAX_BODY_SIZE = 64 * 1024; // 64 KB
+const MAX_BODY_SIZE = 8 * 1024; // 8 KB — logo config is tiny
 
 export async function parseJsonBody(req: NextRequest): Promise<{ data: unknown } | { error: Response }> {
-  const contentLength = req.headers.get('content-length');
-  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+  const contentLengthRaw = req.headers.get('content-length');
+  const contentLength = contentLengthRaw !== null ? Number(contentLengthRaw) : null;
+
+  if (contentLength !== null && (Number.isNaN(contentLength) || contentLength > MAX_BODY_SIZE)) {
     return { error: Response.json({ error: 'Request body too large' }, { status: 413 }) };
   }
 

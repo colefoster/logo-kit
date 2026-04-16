@@ -58,6 +58,19 @@ describe('isLogoProduct', () => {
     expect(isLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star', fontSize: NaN })).toBe(false);
   });
 
+  it('rejects absurdly large fontSize', () => {
+    expect(isLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star', fontSize: 201 })).toBe(false);
+    expect(isLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star', fontSize: Number.MAX_SAFE_INTEGER })).toBe(false);
+  });
+
+  it('accepts fontSize at the upper bound (200)', () => {
+    expect(isLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star', fontSize: 200 })).toBe(true);
+  });
+
+  it('rejects name exceeding 100 chars', () => {
+    expect(isLogoProduct({ name: 'a'.repeat(101), color: '#ff0000', icon: 'star' })).toBe(false);
+  });
+
   it('accepts undefined fontSize (omitted)', () => {
     expect(isLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star' })).toBe(true);
   });

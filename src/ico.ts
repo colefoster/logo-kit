@@ -1,6 +1,13 @@
 import { rasterizeSvg } from './raster';
 
-const ICO_SIZES = [16, 32, 48];
+// ICO spec: width/height fields are UInt8. Size 256 is encoded as 0.
+// Values > 256 or > 255 (non-256) would silently corrupt — enforce at declaration.
+const ICO_SIZES = [16, 32, 48] as const;
+for (const size of ICO_SIZES) {
+  if (size !== 256 && (size < 1 || size > 255)) {
+    throw new Error(`Invalid ICO_SIZES entry: ${size}. ICO directory supports 1-255 or 256.`);
+  }
+}
 
 export async function generateIco(svgString: string): Promise<Buffer> {
   const pngs = await Promise.all(
@@ -28,8 +35,10 @@ export async function generateIco(svgString: string): Promise<Buffer> {
 
     // Directory entry: width(1) + height(1) + colorCount(1) + reserved(1) +
     //                  planes(2) + bitCount(2) + bytesInRes(4) + imageOffset(4)
-    buf.writeUInt8(size, entryOffset);
-    buf.writeUInt8(size, entryOffset + 1);
+    // ICO uses 0 to represent 256
+    const encodedSize = size === 256 ? 0 : size;
+    buf.writeUInt8(encodedSize, entryOffset);
+    buf.writeUInt8(encodedSize, entryOffset + 1);
     buf.writeUInt8(0, entryOffset + 2);  // colorCount
     buf.writeUInt8(0, entryOffset + 3);  // reserved
     buf.writeUInt16LE(1, entryOffset + 4);  // planes

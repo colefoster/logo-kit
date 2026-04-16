@@ -17,10 +17,22 @@ function lucideIconsDir(): string {
 // Cache icon paths and icon list at module level — they're static after deploy
 const iconPathsCache = new Map<string, string>();
 let iconNamesCache: string[] | null = null;
+let iconNamesSet: Set<string> | null = null;
+
+export function isKnownIcon(iconName: string): boolean {
+  if (!iconNamesSet) {
+    iconNamesSet = new Set(listIconNames());
+  }
+  return iconNamesSet.has(iconName);
+}
 
 export function extractIconPaths(iconName: string): string {
   const cached = iconPathsCache.get(iconName);
   if (cached !== undefined) return cached;
+
+  if (!isKnownIcon(iconName)) {
+    return '';
+  }
 
   const iconPath = join(lucideIconsDir(), `${iconName}.svg`);
   const svgContent = readFileSync(iconPath, 'utf-8');

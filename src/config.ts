@@ -106,7 +106,7 @@ export function isLogoProduct(v: unknown): v is LogoProduct {
   }
 
   if ('fontSize' in obj && obj['fontSize'] !== undefined) {
-    if (typeof obj['fontSize'] !== 'number' || !isFinite(obj['fontSize']) || obj['fontSize'] <= 0) {
+    if (typeof obj['fontSize'] !== 'number' || !isFinite(obj['fontSize']) || obj['fontSize'] <= 0 || obj['fontSize'] > 200) {
       return false;
     }
   }
