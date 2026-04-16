@@ -15,7 +15,7 @@
     "react-dom": "^19.0.0",
     "sharp": "^0.34.5",
     "svgo": "^3.3.3",
-    "lucide-static": "*"
+    "lucide-static": "^0.469.0"
   },
   "devDependencies": {
     "@types/archiver": "^6.0.3",

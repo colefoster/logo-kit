@@ -92,7 +92,7 @@ export function isLogoProduct(v: unknown): v is LogoProduct {
   if (typeof v !== 'object' || v === null) return false;
   const obj = v as Record<string, unknown>;
 
-  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '') return false;
+  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '' || obj['name'].length > 100) return false;
   if (typeof obj['color'] !== 'string' || !HEX_COLOR_RE.test(obj['color'])) return false;
 
   if ('type' in obj) {

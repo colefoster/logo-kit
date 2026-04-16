@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { xmlEscape } from './config';
 import type { LogoProduct } from './config';
@@ -14,13 +14,21 @@ function lucideIconsDir(): string {
   return join(process.cwd(), 'node_modules', 'lucide-static', 'icons');
 }
 
+// Cache icon paths and icon list at module level — they're static after deploy
+const iconPathsCache = new Map<string, string>();
+let iconNamesCache: string[] | null = null;
+
 export function extractIconPaths(iconName: string): string {
+  const cached = iconPathsCache.get(iconName);
+  if (cached !== undefined) return cached;
+
   const iconPath = join(lucideIconsDir(), `${iconName}.svg`);
   const svgContent = readFileSync(iconPath, 'utf-8');
-  // Extract the inner content of the SVG (paths, circles, etc.) stripping the outer <svg> tag
   const match = svgContent.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
-  if (!match) return '';
-  return match[1].trim();
+  const paths = match ? match[1].trim() : '';
+
+  iconPathsCache.set(iconName, paths);
+  return paths;
 }
 
 export function generateSvg(product: LogoProduct): string {
@@ -66,9 +74,11 @@ export function generateSvg(product: LogoProduct): string {
 }
 
 export function listIconNames(): string[] {
+  if (iconNamesCache) return iconNamesCache;
+
   const dir = lucideIconsDir();
-  const { readdirSync } = require('fs') as typeof import('fs');
-  return readdirSync(dir)
+  iconNamesCache = readdirSync(dir)
     .filter((f: string) => f.endsWith('.svg'))
     .map((f: string) => f.replace(/\.svg$/, ''));
+  return iconNamesCache;
 }
