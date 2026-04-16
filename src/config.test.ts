@@ -96,25 +96,25 @@ describe('htmlEscape', () => {
 });
 
 describe('isExportSelection', () => {
-  it('accepts valid preset names', () => {
-    expect(isExportSelection({ presets: ['Favicon 32×32', 'Logo 1x'] })).toBe(true);
+  it('accepts valid preset keys', () => {
+    expect(isExportSelection({ presets: ['favicon-32', 'logo-1x'] })).toBe(true);
   });
 
   it('accepts empty presets array', () => {
     expect(isExportSelection({ presets: [] })).toBe(true);
   });
 
-  it('accepts all known preset names', () => {
-    const allNames = SIZE_PRESETS.map((p) => p.name);
-    expect(isExportSelection({ presets: allNames })).toBe(true);
+  it('accepts all known preset keys', () => {
+    const allKeys = SIZE_PRESETS.map((p) => p.key);
+    expect(isExportSelection({ presets: allKeys })).toBe(true);
   });
 
-  it('rejects unknown preset name', () => {
-    expect(isExportSelection({ presets: ['Not A Real Preset'] })).toBe(false);
+  it('rejects unknown preset key', () => {
+    expect(isExportSelection({ presets: ['not-a-real-preset'] })).toBe(false);
   });
 
-  it('rejects mix of valid and invalid preset names', () => {
-    expect(isExportSelection({ presets: ['Favicon 32×32', 'bogus'] })).toBe(false);
+  it('rejects mix of valid and invalid preset keys', () => {
+    expect(isExportSelection({ presets: ['favicon-32', 'bogus'] })).toBe(false);
   });
 
   it('rejects non-array presets', () => {

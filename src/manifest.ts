@@ -1,15 +1,47 @@
-import { htmlEscape } from './config';
-import type { LogoProduct } from './config';
+import { htmlEscape, PRESET_BY_KEY } from './config';
+import type { LogoProduct, SizePreset } from './config';
 
-export function generateManifest(product: LogoProduct, basePath = '/'): string {
-  const slug = product.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+const DEFAULT_MANIFEST_PRESET_KEYS = ['favicon-32', 'favicon-64', 'apple-touch-180'];
+
+function presetFilename(preset: SizePreset): string {
+  if (preset.format === 'ico') return 'favicon.ico';
+  if (preset.format === 'svg') return 'logo.svg';
+  if (preset.width === preset.height) return `logo-${preset.width}.png`;
+  return `logo-${preset.width}x${preset.height}.png`;
+}
+
+function presetManifestTag(preset: SizePreset, safePath: string): string | null {
+  const file = presetFilename(preset);
+  switch (preset.key) {
+    case 'favicon-32':
+    case 'favicon-64':
+      return `<link rel="icon" type="image/png" sizes="${preset.width}x${preset.height}" href="${safePath}${file}">`;
+    case 'apple-touch-180':
+      return `<link rel="apple-touch-icon" sizes="${preset.width}x${preset.height}" href="${safePath}${file}">`;
+    case 'favicon-ico':
+      return `<link rel="icon" type="image/x-icon" href="${safePath}${file}">`;
+    case 'social-media-og':
+      return `<meta property="og:image" content="${safePath}${file}">`;
+    default:
+      return null;
+  }
+}
+
+export function generateManifest(
+  product: LogoProduct,
+  basePath = '/',
+  selectedPresets: SizePreset[] = DEFAULT_MANIFEST_PRESET_KEYS.map((k) => PRESET_BY_KEY.get(k)!),
+): string {
   const safePath = basePath.endsWith('/') ? basePath : basePath + '/';
   const escapedName = htmlEscape(product.name);
   const escapedColor = htmlEscape(product.color);
+
+  const linkTags = selectedPresets
+    .map((p) => presetManifestTag(p, safePath))
+    .filter((tag): tag is string => tag !== null);
+
   return [
-    `<link rel="icon" type="image/png" sizes="32x32" href="${safePath}${slug}-32.png">`,
-    `<link rel="icon" type="image/png" sizes="64x64" href="${safePath}${slug}-64.png">`,
-    `<link rel="apple-touch-icon" sizes="180x180" href="${safePath}${slug}-180.png">`,
+    ...linkTags,
     `<meta name="application-name" content="${escapedName}">`,
     `<meta name="theme-color" content="${escapedColor}">`,
   ].join('\n');

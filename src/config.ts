@@ -13,6 +13,7 @@ export interface LogoConfig {
 export type ExportFormat = 'svg' | 'png' | 'ico';
 
 export interface SizePreset {
+  key: string;
   name: string;
   width: number;
   height: number;
@@ -20,17 +21,19 @@ export interface SizePreset {
 }
 
 export const SIZE_PRESETS: SizePreset[] = [
-  { name: 'Favicon 32×32',         width: 32,   height: 32,  format: 'png' },
-  { name: 'Favicon 64×64',         width: 64,   height: 64,  format: 'png' },
-  { name: 'Apple Touch Icon',      width: 180,  height: 180, format: 'png' },
-  { name: 'Favicon ICO 32×32',     width: 32,   height: 32,  format: 'ico' },
-  { name: 'Social Media OG',       width: 1200, height: 630, format: 'png' },
-  { name: 'App Icon 512×512',      width: 512,  height: 512, format: 'png' },
-  { name: 'Logo 1x',               width: 128,  height: 128, format: 'png' },
-  { name: 'Logo 2x',               width: 256,  height: 256, format: 'png' },
-  { name: 'Logo 4x',               width: 512,  height: 512, format: 'png' },
-  { name: 'Original SVG',          width: 0,    height: 0,   format: 'svg' },
+  { key: 'favicon-32',       name: 'Favicon 32×32',         width: 32,   height: 32,  format: 'png' },
+  { key: 'favicon-64',       name: 'Favicon 64×64',         width: 64,   height: 64,  format: 'png' },
+  { key: 'apple-touch-180',  name: 'Apple Touch Icon',      width: 180,  height: 180, format: 'png' },
+  { key: 'favicon-ico',      name: 'Favicon ICO 32×32',     width: 32,   height: 32,  format: 'ico' },
+  { key: 'social-media-og',  name: 'Social Media OG',       width: 1200, height: 630, format: 'png' },
+  { key: 'app-icon-512',     name: 'App Icon 512×512',      width: 512,  height: 512, format: 'png' },
+  { key: 'logo-1x',          name: 'Logo 1x',               width: 128,  height: 128, format: 'png' },
+  { key: 'logo-2x',          name: 'Logo 2x',               width: 256,  height: 256, format: 'png' },
+  { key: 'logo-4x',          name: 'Logo 4x',               width: 512,  height: 512, format: 'png' },
+  { key: 'svg',              name: 'Original SVG',          width: 0,    height: 0,   format: 'svg' },
 ];
+
+export const PRESET_BY_KEY = new Map(SIZE_PRESETS.map((p) => [p.key, p]));
 
 export interface ExportSelection {
   presets: string[];
@@ -40,8 +43,7 @@ export function isExportSelection(v: unknown): v is ExportSelection {
   if (typeof v !== 'object' || v === null) return false;
   const obj = v as Record<string, unknown>;
   if (!Array.isArray(obj['presets'])) return false;
-  const knownNames = new Set(SIZE_PRESETS.map((p) => p.name));
-  return obj['presets'].every((item) => typeof item === 'string' && knownNames.has(item));
+  return obj['presets'].every((item) => typeof item === 'string' && PRESET_BY_KEY.has(item));
 }
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
