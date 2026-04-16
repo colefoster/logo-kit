@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { SIZE_PRESETS } from '@/src/config';
+import type { SizePreset } from '@/src/config';
 
 interface Config {
   name: string;
@@ -36,6 +38,29 @@ const DEFAULT_CONFIG: Config = {
 
 const MAX_DROPDOWN_ITEMS = 50;
 
+// Preset grouping
+interface PresetGroup {
+  label: string;
+  keys: string[];
+}
+
+const PRESET_GROUPS: PresetGroup[] = [
+  { label: 'Favicons',    keys: ['favicon-32', 'favicon-64', 'apple-touch-180', 'favicon-ico'] },
+  { label: 'Social Media', keys: ['social-media-og'] },
+  { label: 'App Icons',   keys: ['app-icon-512'] },
+  { label: 'Logo Sizes',  keys: ['svg', 'logo-1x', 'logo-2x', 'logo-4x'] },
+];
+
+const DEFAULT_SELECTED_KEYS = new Set(['svg', 'favicon-32', 'favicon-64', 'apple-touch-180', 'favicon-ico']);
+
+const PRESET_MAP = new Map<string, SizePreset>(SIZE_PRESETS.map((p) => [p.key, p]));
+
+function presetLabel(preset: SizePreset): string {
+  if (preset.format === 'svg') return `${preset.name} · SVG`;
+  const dims = `${preset.width}×${preset.height}`;
+  return `${preset.name} · ${dims} · ${preset.format.toUpperCase()}`;
+}
+
 export default function LogoGenerator() {
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -51,6 +76,28 @@ export default function LogoGenerator() {
   const [iconsError, setIconsError] = useState('');
   const [iconQuery, setIconQuery] = useState(DEFAULT_CONFIG.icon);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Export format selection
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(DEFAULT_SELECTED_KEYS);
+  const allKeys = SIZE_PRESETS.map((p) => p.key);
+  const allSelected = allKeys.every((k) => selectedKeys.has(k));
+
+  function togglePreset(key: string) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedKeys(new Set());
+    } else {
+      setSelectedKeys(new Set(allKeys));
+    }
+  }
 
   // Fetch icon list once on mount
   useEffect(() => {
@@ -143,12 +190,17 @@ export default function LogoGenerator() {
   const displayedIcons = filteredIcons.slice(0, MAX_DROPDOWN_ITEMS);
 
   async function handleDownload() {
+    if (selectedKeys.size === 0) return;
     setDownloading(true);
     try {
+      const payload = {
+        ...buildPayload(config),
+        exports: { presets: Array.from(selectedKeys) },
+      };
       const res = await fetch('/api/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(config)),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) return;
       const blob = await res.blob();
@@ -164,6 +216,13 @@ export default function LogoGenerator() {
       setDownloading(false);
     }
   }
+
+  const fileCount = selectedKeys.size;
+  const downloadLabel = downloading
+    ? 'Downloading…'
+    : fileCount > 0
+    ? `Download Kit (${fileCount} file${fileCount === 1 ? '' : 's'})`
+    : 'Download Kit';
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -299,6 +358,55 @@ export default function LogoGenerator() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
+
+            {/* Export Formats */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Export Formats
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                >
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              <div className="space-y-3">
+                {PRESET_GROUPS.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                      {group.label}
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">
+                      {group.keys.map((key) => {
+                        const preset = PRESET_MAP.get(key);
+                        if (!preset) return null;
+                        const checked = selectedKeys.has(key);
+                        return (
+                          <label
+                            key={key}
+                            className="flex items-center gap-1.5 cursor-pointer min-w-0"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => togglePreset(key)}
+                              className="shrink-0 rounded"
+                              style={{ accentColor: config.color }}
+                            />
+                            <span className="text-xs text-gray-600 truncate">
+                              {presetLabel(preset)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Preview */}
@@ -335,10 +443,10 @@ export default function LogoGenerator() {
             )}
             <button
               onClick={handleDownload}
-              disabled={!previewUrl || !!error || downloading}
+              disabled={!previewUrl || !!error || downloading || selectedKeys.size === 0}
               className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {downloading ? 'Downloading…' : 'Download Kit'}
+              {downloadLabel}
             </button>
           </div>
         </div>
