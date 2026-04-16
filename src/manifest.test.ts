@@ -8,9 +8,9 @@ describe('generateManifest', () => {
     const product: LogoProduct = { name: 'My App', color: '#6366f1', icon: 'star' };
     const manifest = generateManifest(product);
     expect(manifest).toContain('rel="icon"');
-    expect(manifest).toContain('logo-32.png');
-    expect(manifest).toContain('logo-64.png');
-    expect(manifest).toContain('logo-180.png');
+    expect(manifest).toContain('favicon-32.png');
+    expect(manifest).toContain('favicon-64.png');
+    expect(manifest).toContain('apple-touch-180.png');
   });
 
   it('includes application-name and theme-color', () => {
@@ -38,7 +38,7 @@ describe('generateManifest', () => {
     const presets = [PRESET_BY_KEY.get('social-media-og')!];
     const manifest = generateManifest(product, './', presets);
     expect(manifest).toContain('og:image');
-    expect(manifest).toContain('logo-1200x630.png');
+    expect(manifest).toContain('social-media-og.png');
   });
 
   it('includes favicon.ico link when favicon-ico preset is selected', () => {
@@ -54,7 +54,7 @@ describe('generateManifest', () => {
     const presets = [PRESET_BY_KEY.get('apple-touch-180')!];
     const manifest = generateManifest(product, './', presets);
     expect(manifest).toContain('apple-touch-icon');
-    expect(manifest).toContain('logo-180.png');
+    expect(manifest).toContain('apple-touch-180.png');
   });
 
   it('omits tags for presets with no manifest role (e.g. app-icon-512)', () => {

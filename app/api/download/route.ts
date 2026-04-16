@@ -1,20 +1,11 @@
 import { NextRequest } from 'next/server';
-import { isLogoProduct, isExportSelection, sanitizeSlug, PRESET_BY_KEY } from '@/src/config';
+import { isLogoProduct, isExportSelection, sanitizeSlug, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from '@/src/config';
 import type { SizePreset } from '@/src/config';
 import { generateProduct } from '@/src/generate';
 import { rasterizeSvg } from '@/src/raster';
 import { generateIco } from '@/src/ico';
 import { generateManifest } from '@/src/manifest';
 import archiver from 'archiver';
-
-const DEFAULT_EXPORT_KEYS = ['svg', 'favicon-32', 'favicon-64', 'apple-touch-180'];
-
-function presetFilename(preset: SizePreset): string {
-  if (preset.format === 'ico') return 'favicon.ico';
-  if (preset.format === 'svg') return 'logo.svg';
-  if (preset.width === preset.height) return `logo-${preset.width}.png`;
-  return `logo-${preset.width}x${preset.height}.png`;
-}
 
 export async function POST(req: NextRequest): Promise<Response> {
   let body: unknown;
@@ -24,11 +15,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (!isLogoProduct(body)) {
+  if (typeof body !== 'object' || body === null) {
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const obj = body as Record<string, unknown>;
+
+  if (!isLogoProduct(obj)) {
     return Response.json({ error: 'Invalid product config' }, { status: 400 });
   }
 
-  const rawExports = (body as unknown as Record<string, unknown>)['exports'];
+  // Extract exports before narrowing — obj still has the full shape
+  const rawExports = obj['exports'];
   let selectedPresets: SizePreset[];
 
   if (rawExports === undefined) {
@@ -37,12 +35,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!isExportSelection(rawExports)) {
       return Response.json({ error: 'Invalid exports selection: presets must be an array of valid preset keys' }, { status: 400 });
     }
+    if (rawExports.presets.length === 0) {
+      return Response.json({ error: 'At least one export preset must be selected' }, { status: 400 });
+    }
     selectedPresets = rawExports.presets.map((k) => PRESET_BY_KEY.get(k)!);
   }
 
   try {
-    const { optimizedSvg } = await generateProduct(body);
-    const slug = sanitizeSlug(body.name);
+    const product = obj as unknown as import('@/src/config').LogoProduct;
+    const { optimizedSvg } = await generateProduct(product);
+    const slug = sanitizeSlug(product.name);
 
     // Generate all rasterizations in parallel
     const fileEntries = await Promise.all(
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       })
     );
 
-    const manifest = generateManifest(body, './', selectedPresets);
+    const manifest = generateManifest(product, './', selectedPresets);
 
     const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
       const archive = archiver('zip');

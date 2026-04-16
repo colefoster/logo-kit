@@ -28,8 +28,8 @@ export async function generateIco(svgString: string): Promise<Buffer> {
 
     // Directory entry: width(1) + height(1) + colorCount(1) + reserved(1) +
     //                  planes(2) + bitCount(2) + bytesInRes(4) + imageOffset(4)
-    buf.writeUInt8(size === 256 ? 0 : size, entryOffset);
-    buf.writeUInt8(size === 256 ? 0 : size, entryOffset + 1);
+    buf.writeUInt8(size, entryOffset);
+    buf.writeUInt8(size, entryOffset + 1);
     buf.writeUInt8(0, entryOffset + 2);  // colorCount
     buf.writeUInt8(0, entryOffset + 3);  // reserved
     buf.writeUInt16LE(1, entryOffset + 4);  // planes

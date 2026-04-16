@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SIZE_PRESETS } from '@/src/config';
+import { SIZE_PRESETS, DEFAULT_EXPORT_KEYS, PRESET_BY_KEY } from '@/src/config';
 import type { SizePreset } from '@/src/config';
 
 interface Config {
@@ -51,9 +51,8 @@ const PRESET_GROUPS: PresetGroup[] = [
   { label: 'Logo Sizes',  keys: ['svg', 'logo-1x', 'logo-2x', 'logo-4x'] },
 ];
 
-const DEFAULT_SELECTED_KEYS = new Set(['svg', 'favicon-32', 'favicon-64', 'apple-touch-180', 'favicon-ico']);
+const DEFAULT_SELECTED_KEYS = new Set(DEFAULT_EXPORT_KEYS);
 
-const PRESET_MAP = new Map<string, SizePreset>(SIZE_PRESETS.map((p) => [p.key, p]));
 
 function presetLabel(preset: SizePreset): string {
   if (preset.format === 'svg') return `${preset.name} · SVG`;
@@ -381,7 +380,7 @@ export default function LogoGenerator() {
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">
                       {group.keys.map((key) => {
-                        const preset = PRESET_MAP.get(key);
+                        const preset = PRESET_BY_KEY.get(key);
                         if (!preset) return null;
                         const checked = selectedKeys.has(key);
                         return (

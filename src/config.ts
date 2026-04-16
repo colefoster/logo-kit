@@ -35,6 +35,14 @@ export const SIZE_PRESETS: SizePreset[] = [
 
 export const PRESET_BY_KEY = new Map(SIZE_PRESETS.map((p) => [p.key, p]));
 
+export const DEFAULT_EXPORT_KEYS = ['svg', 'favicon-32', 'favicon-64', 'apple-touch-180', 'favicon-ico'];
+
+export function presetFilename(preset: SizePreset): string {
+  if (preset.format === 'ico') return 'favicon.ico';
+  if (preset.format === 'svg') return 'logo.svg';
+  return `${preset.key}.png`;
+}
+
 export interface ExportSelection {
   presets: string[];
 }

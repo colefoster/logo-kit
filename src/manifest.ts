@@ -1,14 +1,5 @@
-import { htmlEscape, PRESET_BY_KEY } from './config';
+import { htmlEscape, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from './config';
 import type { LogoProduct, SizePreset } from './config';
-
-const DEFAULT_MANIFEST_PRESET_KEYS = ['favicon-32', 'favicon-64', 'apple-touch-180'];
-
-function presetFilename(preset: SizePreset): string {
-  if (preset.format === 'ico') return 'favicon.ico';
-  if (preset.format === 'svg') return 'logo.svg';
-  if (preset.width === preset.height) return `logo-${preset.width}.png`;
-  return `logo-${preset.width}x${preset.height}.png`;
-}
 
 function presetManifestTag(preset: SizePreset, safePath: string): string | null {
   const file = presetFilename(preset);
@@ -30,7 +21,7 @@ function presetManifestTag(preset: SizePreset, safePath: string): string | null 
 export function generateManifest(
   product: LogoProduct,
   basePath = '/',
-  selectedPresets: SizePreset[] = DEFAULT_MANIFEST_PRESET_KEYS.map((k) => PRESET_BY_KEY.get(k)!),
+  selectedPresets: SizePreset[] = DEFAULT_EXPORT_KEYS.map((k) => PRESET_BY_KEY.get(k)!),
 ): string {
   const safePath = basePath.endsWith('/') ? basePath : basePath + '/';
   const escapedName = htmlEscape(product.name);
