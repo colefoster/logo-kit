@@ -20,9 +20,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   try {
     const { optimizedSvg } = await generateProduct(body);
     const [png32, png64, png180] = await Promise.all([
-      rasterizeSvg(optimizedSvg, 32),
-      rasterizeSvg(optimizedSvg, 64),
-      rasterizeSvg(optimizedSvg, 180),
+      rasterizeSvg(optimizedSvg, 32, 32),
+      rasterizeSvg(optimizedSvg, 64, 64),
+      rasterizeSvg(optimizedSvg, 180, 180),
     ]);
 
     // Use name:'logo' so manifest references logo-32.png etc., matching fixed filenames

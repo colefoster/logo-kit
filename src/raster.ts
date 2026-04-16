@@ -1,8 +1,8 @@
 import sharp from 'sharp';
 
-export async function rasterizeSvg(svgString: string, size: number): Promise<Buffer> {
+export async function rasterizeSvg(svgString: string, width: number, height: number): Promise<Buffer> {
   return sharp(Buffer.from(svgString))
-    .resize(size, size)
+    .resize(width, height)
     .png()
     .toBuffer();
 }

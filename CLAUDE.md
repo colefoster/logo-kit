@@ -1,71 +1,42 @@
-# Logo Kit
+## Coding Conventions
 
-## Tech Stack
-- Next.js 15 (App Router) with React 19
-- TypeScript (strict mode)
-- Tailwind CSS 3
-- lucide-static (icon SVGs read from node_modules at runtime)
-- SVGO (SVG optimization)
-- Sharp (PNG rasterization)
-- Vitest (testing)
-- Deployed at logo-kit.fostered.dev
+## Architecture
+- Next.js 15 App Router with React 19, TypeScript strict mode, Tailwind CSS 3
+- Core logic lives in `src/` (config.ts, svg.ts, generate.ts, raster.ts, manifest.ts)
+- API routes in `app/api/` — each is a `route.ts` in a nested directory
+- Single client component: `app/LogoGenerator.tsx` ('use client')
 
-## Project Layout
-- `app/` — Next.js App Router pages, layouts, and API routes
-- `app/api/` — API route handlers (preview, icons, download, up)
-- `app/LogoGenerator.tsx` — Main client component ('use client')
-- `src/` — Core generation logic (config, svg, generate, raster, manifest)
-- `src/config.ts` — LogoProduct type, isLogoProduct() validator, escaping utilities
+## Key Functions to Reuse
+- `generateProduct(product)` → `{ rawSvg, optimizedSvg }` — SVG generation + SVGO optimization
+- `rasterizeSvg(svg, width, height)` — Sharp-based PNG rasterization (after task 1 updates the signature)
+- `generateManifest(product, basePath)` — HTML favicon/meta snippet
+- `sanitizeSlug(value)` — Safe filename from product name
+- `isLogoProduct(v)` — Input validation guard for API routes
+- `xmlEscape(str)` / `htmlEscape(str)` — Output escaping
 
-## Conventions
-- Health check endpoint: GET /up — must return HTTP 200 with no auth required. Verify the file path matches the expected URL (app/api/up/route.ts serves /api/up, NOT /up — reconcile if the monitoring URL differs)
-- Do NOT commit build artifacts: tsconfig.tsbuildinfo, .next/, next-env.d.ts (auto-generated), *.tsbuildinfo
-- SVG rendering in browser: use <img> with blob URLs to sandbox script execution — never use dangerouslySetInnerHTML for SVG
-- useEffect dependency arrays must satisfy the React exhaustive-deps lint rule — use useCallback or inline logic
-- SVGO preset-default strips scripts from SVGs but this is implicit — do not rely on it alone for user-facing SVG rendering
-- Input validation: all API routes validate with isLogoProduct() before processing; icon names validated against /^[a-z0-9-]+$/ to prevent path traversal
-- File naming in API routes: use route.ts in nested directories (e.g., app/api/download/route.ts)
-- No additional UI component libraries — use Tailwind CSS only for styling
-- Existing utilities to reuse: generateProduct() for SVG, rasterizeSvg() for PNGs, generateManifest() for HTML snippet, sanitizeSlug() for filenames
-- Before pushing: always run `npm run build` locally to verify the build succeeds. A broken build = a dead site.
-- next-env.d.ts: let Next.js regenerate this file — never edit it manually or commit a version that imports from .next/
+## Validation Pattern
+- All API routes validate with `isLogoProduct()` before processing
+- Icon names validated against `/^[a-z0-9-]+$/` to prevent path traversal
+- Return HTTP 400 with `{ error: string }` for invalid input
 
+## Security Rules
+- SVG rendered in browser via `<img>` with blob URLs — NEVER use dangerouslySetInnerHTML
+- SVGO preset-default strips scripts from SVGs
+- All user strings XML-escaped before embedding in SVG, HTML-escaped in manifest
 
-## Known Pitfalls
-These issues have occurred before — avoid repeating them:
-- **build_failure**: 
-- **rejection**: Stream file not found
-- **rejection**: The implementation satisfies most acceptance criteria and is generally well-structured. However, there is a high-severity XSS issue with dangerouslySetInnerHTML rendering SVG from the API, and a medium issue with the missing dependency array warning in useEffect.
-[high] XSS via dangerouslySetInnerHTML at LogoGenerator.tsx:186. The SVG response from /api/preview is rendered directly into the DOM via dangerouslySetInnerHTML. While the server-side does validate with isLogoProduct() and sanitizes the name via xmlEscape(), the SVG returned from SVGO optimization could theoretically be manipulated if the SVGO pipeline or icon files are compromised. More concretely, the product name is XML-escaped but the icon SVG content loaded from lucide-static files is NOT sanitized — it's read from disk and embedded directly (svg.ts:extractIconPaths). If a malicious icon SVG contained <script> or event handlers (onload, onerror), they would execute in the browser. The SVGO preset-default plugin does strip scripts, which mitigates this, but the defense is implicit rather than explicit. Recommendation: Either (a) add an explicit DOMPurify sanitization step on the client before dangerouslySetInnerHTML, or (b) render the SVG inside an <img> tag using a data URI or blob URL (which sandboxes script execution), or (c) at minimum document that the SVGO optimization is the security boundary and add a test verifying script tags are stripped from optimized output.
-[medium] useEffect has a missing dependency: `buildPayload` function is called inside the effect but not listed in the dependency array (LogoGenerator.tsx:44-74). The dependency array is [config], which is correct in practice since buildPayload is a pure function of its argument and config captures all state changes. However, the React linter will flag this. Move buildPayload outside the component or wrap it in useCallback, or inline the logic in the effect.
-[medium] The `next-env.d.ts` file in the diff (line 3) contains `import './.next/types/routes.d.ts'` — this is an auto-generated file that references build artifacts. It should be in .gitignore and not committed, as it may cause issues on fresh clones before the first build. Standard Next.js practice is to let `next build` or `next dev` regenerate it.
-[low] The error response parsing at LogoGenerator.tsx:56 uses `as { error?: string }` type assertion. If the error response is not JSON (e.g., a 500 HTML page), res.json() is caught, but the fallback object could be improved. This is minor since it already has the .catch() fallback.
-[low] No initial preview on mount. The useEffect fires on mount with the default config, which is good — the user sees a preview immediately. However, there's a brief 300ms delay before the first fetch due to the debounce. Consider fetching immediately on mount (skip debounce for the initial render) for a snappier first load.
-[low] The `next-env.d.ts` import line `import './.next/types/routes.d.ts'` is non-standard for Next.js 15. Normally this file only has `/// <reference>` directives, not import statements. Verify this was auto-generated and not manually edited.
-- **rejection**: The LogoGenerator.tsx UI changes are solid polish — keeping the previous preview visible while loading, showing an 'Updating…' indicator, and improving error display. However, a large build artifact was committed.
-[medium] `tsconfig.tsbuildinfo` is a TypeScript incremental build cache file and should not be committed. It's a build artifact that changes on every compilation and adds noise to the repo. Add it to `.gitignore` and remove it from the commit.
-[low] When `error` is truthy AND `previewUrl` is set, the error message now renders below the preview (`<p>` tag at line ~228) while the old preview image remains visible. This is reasonable UX, but consider whether showing a stale preview alongside an error could confuse users — e.g., if the error is about an invalid config, the preview still shows the last valid result with no visual indication it's outdated (only the dim loading state, which clears when loading finishes with an error).
-- **rejection**: The diff does not contain any changes that would fix a build failure. It consists of (1) a CLAUDE.md documentation rewrite and (2) a new health check route at /up. Neither addresses TypeScript compilation errors, broken imports, or missing modules — the stated acceptance criteria. The health check route addition is fine on its own, but it's a feature, not a build fix.
-[high] Acceptance criteria not met: The diff contains no code changes that fix a build failure. There are no TypeScript error fixes, no import corrections, and no module resolutions. The CLAUDE.md changes are documentation-only and cannot affect the build. If the build was genuinely broken, the fix is missing from this diff; if it wasn't broken, the commit message and task framing are misleading.
-[medium] Duplicate health check routes: Both `app/api/up/route.ts` and the new `app/up/route.ts` exist with identical code. This serves `/api/up` and `/up` respectively. If the monitoring URL is `/up`, the old `/api/up` route is now dead code and should be removed to avoid confusion. Conversely, if both are needed, document why.
-[medium] `tsconfig.tsbuildinfo` is still missing from `.gitignore`. A prior review rejection specifically flagged this build artifact as something that should not be committed. This diff was the right place to add `*.tsbuildinfo` to `.gitignore`.
-[low] CLAUDE.md cleanup is good but loses some useful context (e.g., security requirements details, config schema documentation, deployment notes). While the new version is more concise, verify that critical operational knowledge isn't lost — particularly the security sanitization requirements and the Docker deployment details.
-- **rejection**: The diff adds *.tsbuildinfo to .gitignore and removes tsconfig.tsbuildinfo from tracking, which is good. However, it only partially meets the acceptance criteria — .next/ and next-env.d.ts are missing from .gitignore and not removed from git tracking. The CLAUDE.md changes are documentation updates that weren't requested.
-[high] Acceptance criteria not fully met: .gitignore is missing entries for `.next/` and `next-env.d.ts`. The criteria explicitly require all three: tsconfig.tsbuildinfo, .next/, and next-env.d.ts.
-[high] Acceptance criteria not fully met: `next-env.d.ts` was not removed from git tracking (no `git rm --cached next-env.d.ts` evidence in the diff). The criteria require both files to be untracked.
-[medium] Acceptance criteria violated: 'No other files are modified' — but CLAUDE.md was modified with documentation additions. While the CLAUDE.md changes are reasonable on their own, they fall outside the stated scope.
-- **rejection**: The diff only adds .vercel and *.tgz to .gitignore. It does not add .next/ or next-env.d.ts entries, and there is no evidence that tsconfig.tsbuildinfo or next-env.d.ts were removed from git tracking via `git rm --cached`. The acceptance criteria are largely unmet.
-[high] .gitignore is missing entries for `.next/` and `next-env.d.ts`. The acceptance criteria explicitly require both.
-[high] No evidence that `next-env.d.ts` was removed from git tracking (`git rm --cached next-env.d.ts`). The acceptance criteria require `git ls-files next-env.d.ts` to return empty.
-[high] No evidence that `tsconfig.tsbuildinfo` was removed from git tracking (`git rm --cached tsconfig.tsbuildinfo`). The *.tsbuildinfo glob was already in .gitignore from a prior commit, but if the file is still tracked, the gitignore entry has no effect. The diff should include the `git rm --cached` step.
-[low] The `node_modules/` entry is listed in acceptance criteria but not added in this diff. It may already exist in .gitignore (the diff context doesn't show the full file), so this is only an issue if it's actually missing.
-[low] The `.env*` entry is listed in acceptance criteria but not added. Same caveat — may already be present.
+## ZIP Structure
+- All files go under `{slug}/` folder in the ZIP
+- Use `archiver` library (already a dependency) for ZIP creation
+- Filename convention: `logo.svg`, `logo-{width}.png` (square), `logo-{width}x{height}.png` (non-square), `favicon.ico`, `manifest.html`
 
-## Learned Patterns
-- [dependency_vulnerability] Logo Kit has vulnerable dependencies (npm): npm warn config production Use `--omit=dev` instead.
-npm error code ENOLOCK
-npm error audit This command requires an existing lockfile.
-npm error audit Try creating one first with: npm i --package-lock-only
-npm error audit Original error: loadVirtual requires existing shrinkwrap file
-npm error A complete log of this run can be found in: /root/.npm/_logs/2026-04-14T23_02_17_118Z-debug-0.log
-- [health_failure] Logo Kit health check failed: HTTP 404 from https://logo-kit.fostered.dev/up
+## Testing
+- Vitest for unit tests, files named `*.test.ts` next to source
+- Run `npm run build` to verify — broken build = broken deploy
+
+## Styling
+- Tailwind CSS only — no component libraries
+- Responsive: design for mobile-first, enhance for desktop
+
+## Dependencies
+- sharp (rasterization), archiver (ZIP), svgo (optimization), lucide-static (icons)
+- Prefer implementing simple formats (like ICO) directly over adding dependencies
