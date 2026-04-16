@@ -1,8 +1,8 @@
 import { rasterizeSvg } from './raster';
 
 // ICO spec: width/height fields are UInt8. Size 256 is encoded as 0.
-// Values > 256 or > 255 (non-256) would silently corrupt — enforce at declaration.
-const ICO_SIZES = [16, 32, 48] as const;
+// Values > 255 (non-256) would silently corrupt — enforce at declaration.
+const ICO_SIZES: readonly number[] = [16, 32, 48];
 for (const size of ICO_SIZES) {
   if (size !== 256 && (size < 1 || size > 255)) {
     throw new Error(`Invalid ICO_SIZES entry: ${size}. ICO directory supports 1-255 or 256.`);
