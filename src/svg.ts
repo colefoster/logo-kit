@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { xmlEscape } from './config';
 import type { LogoProduct } from './config';
@@ -10,8 +10,35 @@ const ICON_X = 32;
 const ICON_Y = 16;
 const TEXT_Y = 104;
 
+let iconsDirCache: string | null = null;
+
+/**
+ * Locate the lucide-static icon directory.
+ *
+ * The standalone build chdir's into `.next/standalone`, where the traced copy of
+ * node_modules lives, so cwd resolution holds in both dev and production -- but a
+ * missing tracing include used to surface as a bare ENOENT from readdirSync deep
+ * in a request. Fail loudly and once instead, and allow an explicit override.
+ */
 function lucideIconsDir(): string {
-  return join(process.cwd(), 'node_modules', 'lucide-static', 'icons');
+  if (iconsDirCache) return iconsDirCache;
+
+  const candidates = [
+    process.env['LUCIDE_ICONS_DIR'],
+    join(process.cwd(), 'node_modules', 'lucide-static', 'icons'),
+  ].filter((c): c is string => Boolean(c));
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      iconsDirCache = candidate;
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `lucide-static icons not found. Looked in: ${candidates.join(', ')}. ` +
+      'A standalone build needs outputFileTracingIncludes for node_modules/lucide-static/icons.',
+  );
 }
 
 // Cache icon paths and icon list at module level — they're static after deploy
@@ -85,12 +112,13 @@ export function generateSvg(product: LogoProduct): string {
 </svg>`;
 }
 
-export function listIconNames(): string[] {
+export function listIconNames(): readonly string[] {
   if (iconNamesCache) return iconNamesCache;
 
   const dir = lucideIconsDir();
   iconNamesCache = readdirSync(dir)
     .filter((f: string) => f.endsWith('.svg'))
-    .map((f: string) => f.replace(/\.svg$/, ''));
+    .map((f: string) => f.replace(/\.svg$/, ''))
+    .sort();
   return iconNamesCache;
 }
