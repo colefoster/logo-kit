@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { isLogoProduct, isExportSelection, sanitizeSlug, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from '@/src/config';
+import { isLogoProduct, isExportSelection, sanitizeSlug, letterboxColor, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from '@/src/config';
 import type { LogoProduct, SizePreset } from '@/src/config';
 import { generateProduct } from '@/src/generate';
 import { isKnownIcon } from '@/src/svg';
@@ -72,6 +72,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     const product = obj as unknown as LogoProduct;
     const { optimizedSvg } = await generateProduct(product);
     const slug = sanitizeSlug(product.name);
+    const background = letterboxColor(product);
+
+    // Several presets share dimensions (app-icon-512 and logo-4x are both 512x512),
+    // and rasterizing 512px twice on a small box is pure waste. Key by the render
+    // inputs so identical renders are awaited once.
+    const renders = new Map<string, Promise<Buffer>>();
+    function render(key: string, fn: () => Promise<Buffer>): Promise<Buffer> {
+      const existing = renders.get(key);
+      if (existing) return existing;
+      const started = fn();
+      renders.set(key, started);
+      return started;
+    }
 
     const fileEntries = await mapWithConcurrency(
       selectedPresets,
@@ -82,10 +95,11 @@ export async function POST(req: NextRequest): Promise<Response> {
           return { filename, data: Buffer.from(optimizedSvg) };
         }
         if (preset.format === 'ico') {
-          const data = await generateIco(optimizedSvg);
-          return { filename, data };
+          return { filename, data: await render('ico', () => generateIco(optimizedSvg)) };
         }
-        const data = await rasterizeSvg(optimizedSvg, preset.width, preset.height);
+        const data = await render(`png:${preset.width}x${preset.height}`, () =>
+          rasterizeSvg(optimizedSvg, preset.width, preset.height, background),
+        );
         return { filename, data };
       },
     );
@@ -93,8 +107,15 @@ export async function POST(req: NextRequest): Promise<Response> {
     const manifest = generateManifest(product, './', selectedPresets);
     const encodedSlug = encodeURIComponent(slug);
 
-    // Stream archive directly to the response
+    // Stream archive directly to the response. Every entry is an in-memory Buffer
+    // by this point, so an archiver error is unlikely -- but an unhandled 'error'
+    // on a Node stream takes the whole process down, and this process serves
+    // every other request too.
     const archive = archiver('zip');
+    archive.on('error', (err) => {
+      console.error('Archive stream failed:', err);
+      archive.destroy(err);
+    });
     for (const { filename, data } of fileEntries) {
       archive.append(data, { name: `${slug}/${filename}` });
     }
@@ -107,6 +128,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     return new Response(webStream, {
       headers: {
         'Content-Type': 'application/zip',
+        'Cache-Control': 'no-store',
         'Content-Disposition': `attachment; filename="${slug}-logo-kit.zip"; filename*=UTF-8''${encodedSlug}-logo-kit.zip`,
       },
     });

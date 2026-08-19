@@ -26,6 +26,19 @@ describe('isLogoProduct', () => {
     expect(isLogoProduct({ name: 'Test', color: 'red', icon: 'star' })).toBe(false);
   });
 
+  it('accepts every hex length CSS supports', () => {
+    for (const color of ['#f00', '#f00a', '#ff0000', '#ff0000aa']) {
+      expect(isLogoProduct({ name: 'Test', color, icon: 'star' })).toBe(true);
+    }
+  });
+
+  it('rejects hex lengths CSS does not support', () => {
+    // /^#[0-9a-f]{3,8}$/ used to wave these through; they render as black in the SVG.
+    for (const color of ['#12345', '#1234567', '#1', '#12']) {
+      expect(isLogoProduct({ name: 'Test', color, icon: 'star' })).toBe(false);
+    }
+  });
+
   it('rejects invalid color with script', () => {
     expect(isLogoProduct({ name: 'Test', color: 'javascript:alert(1)', icon: 'star' })).toBe(false);
   });

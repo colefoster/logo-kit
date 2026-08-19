@@ -37,6 +37,21 @@ export const PRESET_BY_KEY = new Map(SIZE_PRESETS.map((p) => [p.key, p]));
 
 export const DEFAULT_EXPORT_KEYS = ['svg', 'favicon-32', 'favicon-64', 'apple-touch-180', 'favicon-ico'];
 
+// The UI and the server guard must agree on this, or the form silently offers
+// values the API rejects.
+export const MAX_FONT_SIZE = 200;
+export const MAX_NAME_LENGTH = 100;
+
+/**
+ * Colour to letterbox a non-square export with. An icon logo already paints a
+ * full-bleed rounded rect in `color`, so matching it makes the padding invisible;
+ * text-only logos draw the text itself in `color`, so padding with it would erase
+ * the logo -- pad with white there.
+ */
+export function letterboxColor(product: LogoProduct): string {
+  return (product.type ?? 'icon') === 'text-only' ? '#ffffff' : product.color;
+}
+
 export function presetFilename(preset: SizePreset): string {
   if (preset.format === 'ico') return 'favicon.ico';
   if (preset.format === 'svg') return 'logo.svg';
@@ -54,9 +69,10 @@ export function isExportSelection(v: unknown): v is ExportSelection {
   return obj['presets'].every((item) => typeof item === 'string' && PRESET_BY_KEY.has(item));
 }
 
-const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+// Only the four lengths CSS actually accepts. The old /{3,8}/ let #12345 through,
+// which lands in the SVG as an invalid fill and renders black.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const ICON_NAME_RE = /^[a-z0-9-]+$/;
-const SLUG_RE = /^[a-z0-9-]+$/;
 
 export function sanitizeSlug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -92,7 +108,7 @@ export function isLogoProduct(v: unknown): v is LogoProduct {
   if (typeof v !== 'object' || v === null) return false;
   const obj = v as Record<string, unknown>;
 
-  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '' || obj['name'].length > 100) return false;
+  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '' || obj['name'].length > MAX_NAME_LENGTH) return false;
   if (typeof obj['color'] !== 'string' || !HEX_COLOR_RE.test(obj['color'])) return false;
 
   if ('type' in obj) {
@@ -106,7 +122,7 @@ export function isLogoProduct(v: unknown): v is LogoProduct {
   }
 
   if ('fontSize' in obj && obj['fontSize'] !== undefined) {
-    if (typeof obj['fontSize'] !== 'number' || !isFinite(obj['fontSize']) || obj['fontSize'] <= 0 || obj['fontSize'] > 200) {
+    if (typeof obj['fontSize'] !== 'number' || !isFinite(obj['fontSize']) || obj['fontSize'] <= 0 || obj['fontSize'] > MAX_FONT_SIZE) {
       return false;
     }
   }
