@@ -104,30 +104,58 @@ export function htmlEscape(str: string): string {
   });
 }
 
-export function isLogoProduct(v: unknown): v is LogoProduct {
-  if (typeof v !== 'object' || v === null) return false;
+export type Validated<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * Validate an untrusted product config, reporting *which* field is wrong.
+ *
+ * The API used to answer every bad field with "Invalid product config", so a
+ * mistyped colour and a missing name were indistinguishable in the UI.
+ */
+export function validateLogoProduct(v: unknown): Validated<LogoProduct> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+    return { ok: false, error: 'Config must be a JSON object' };
+  }
   const obj = v as Record<string, unknown>;
 
-  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '' || obj['name'].length > MAX_NAME_LENGTH) return false;
-  if (typeof obj['color'] !== 'string' || !HEX_COLOR_RE.test(obj['color'])) return false;
-
-  if ('type' in obj) {
-    if (obj['type'] !== 'icon' && obj['type'] !== 'text-only') return false;
+  if (typeof obj['name'] !== 'string' || obj['name'].trim() === '') {
+    return { ok: false, error: 'Name is required' };
+  }
+  if (obj['name'].length > MAX_NAME_LENGTH) {
+    return { ok: false, error: `Name must be ${MAX_NAME_LENGTH} characters or fewer` };
   }
 
-  const type = (obj['type'] as string | undefined) ?? 'icon';
+  if (typeof obj['color'] !== 'string' || !HEX_COLOR_RE.test(obj['color'])) {
+    return { ok: false, error: 'Color must be a hex value like #6366f1' };
+  }
 
-  if (type !== 'text-only') {
-    if (typeof obj['icon'] !== 'string' || !ICON_NAME_RE.test(obj['icon'])) return false;
+  if ('type' in obj && obj['type'] !== 'icon' && obj['type'] !== 'text-only') {
+    return { ok: false, error: 'Type must be "icon" or "text-only"' };
+  }
+
+  const type = (obj['type'] as LogoProduct['type']) ?? 'icon';
+
+  if (type !== 'text-only' && (typeof obj['icon'] !== 'string' || !ICON_NAME_RE.test(obj['icon']))) {
+    return { ok: false, error: 'Pick an icon (lowercase letters, digits and dashes)' };
   }
 
   if ('fontSize' in obj && obj['fontSize'] !== undefined) {
-    if (typeof obj['fontSize'] !== 'number' || !isFinite(obj['fontSize']) || obj['fontSize'] <= 0 || obj['fontSize'] > MAX_FONT_SIZE) {
-      return false;
+    const fontSize = obj['fontSize'];
+    if (
+      typeof fontSize !== 'number' ||
+      !Number.isFinite(fontSize) ||
+      fontSize <= 0 ||
+      fontSize > MAX_FONT_SIZE
+    ) {
+      return { ok: false, error: `Font size must be between 1 and ${MAX_FONT_SIZE}` };
     }
   }
 
-  return true;
+  return { ok: true, value: obj as unknown as LogoProduct };
+}
+
+export function isLogoProduct(v: unknown): v is LogoProduct {
+  return validateLogoProduct(v).ok;
 }
 
 export function parseConfig(raw: unknown): LogoConfig {
@@ -139,10 +167,11 @@ export function parseConfig(raw: unknown): LogoConfig {
     throw new Error('Config must have a "products" array');
   }
   const products = obj['products'].map((p, i) => {
-    if (!isLogoProduct(p)) {
-      throw new Error(`Product at index ${i} is invalid`);
+    const validated = validateLogoProduct(p);
+    if (!validated.ok) {
+      throw new Error(`Product at index ${i} is invalid: ${validated.error}`);
     }
-    return p;
+    return validated.value;
   });
   return { products };
 }

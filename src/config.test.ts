@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isLogoProduct, xmlEscape, htmlEscape, isExportSelection, SIZE_PRESETS } from './config';
+import { isLogoProduct, xmlEscape, htmlEscape, isExportSelection, SIZE_PRESETS, validateLogoProduct } from './config';
 
 describe('isLogoProduct', () => {
   it('accepts valid icon product', () => {
@@ -161,5 +161,30 @@ describe('isExportSelection', () => {
 
   it('rejects array items that are not strings', () => {
     expect(isExportSelection({ presets: [42] })).toBe(false);
+  });
+});
+
+describe('validateLogoProduct messages', () => {
+  function errorFor(input: unknown): string {
+    const result = validateLogoProduct(input);
+    if (result.ok) throw new Error('expected validation to fail');
+    return result.error;
+  }
+
+  it('names the offending field instead of a blanket "invalid config"', () => {
+    expect(errorFor({ color: '#ff0000', icon: 'star' })).toMatch(/name/i);
+    expect(errorFor({ name: 'Test', color: 'red', icon: 'star' })).toMatch(/hex/i);
+    expect(errorFor({ name: 'Test', color: '#ff0000' })).toMatch(/icon/i);
+    expect(errorFor({ name: 'Test', color: '#ff0000', icon: 'star', fontSize: 500 })).toMatch(/font size/i);
+    expect(errorFor({ name: 'Test', color: '#ff0000', icon: 'star', type: 'nope' })).toMatch(/type/i);
+  });
+
+  it('rejects arrays, which are objects to typeof', () => {
+    expect(errorFor([])).toMatch(/object/i);
+  });
+
+  it('returns the product on success', () => {
+    const result = validateLogoProduct({ name: 'Test', color: '#ff0000', icon: 'star' });
+    expect(result).toEqual({ ok: true, value: { name: 'Test', color: '#ff0000', icon: 'star' } });
   });
 });

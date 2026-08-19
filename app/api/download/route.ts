@@ -1,6 +1,5 @@
-import { NextRequest } from 'next/server';
-import { isLogoProduct, isExportSelection, sanitizeSlug, letterboxColor, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from '@/src/config';
-import type { LogoProduct, SizePreset } from '@/src/config';
+import { validateLogoProduct, isExportSelection, sanitizeSlug, letterboxColor, PRESET_BY_KEY, DEFAULT_EXPORT_KEYS, presetFilename } from '@/src/config';
+import type { SizePreset } from '@/src/config';
 import { generateProduct } from '@/src/generate';
 import { isKnownIcon } from '@/src/svg';
 import { rasterizeSvg } from '@/src/raster';
@@ -32,28 +31,24 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function POST(req: NextRequest): Promise<Response> {
+export async function POST(req: Request): Promise<Response> {
   const parsed = await parseJsonBody(req);
   if ('error' in parsed) return parsed.error;
 
-  const body = parsed.data;
-
-  if (typeof body !== 'object' || body === null) {
-    return Response.json({ error: 'Invalid request body' }, { status: 400 });
+  const validated = validateLogoProduct(parsed.data);
+  if (!validated.ok) {
+    return Response.json({ error: validated.error }, { status: 400 });
   }
 
-  const obj = body as Record<string, unknown>;
+  const product = validated.value;
 
-  if (!isLogoProduct(obj)) {
-    return Response.json({ error: 'Invalid product config' }, { status: 400 });
+  // The regex guard only proves the name is shaped like an icon name; this proves
+  // the file exists, which also closes off path traversal by construction.
+  if ((product.type ?? 'icon') !== 'text-only' && product.icon && !isKnownIcon(product.icon)) {
+    return Response.json({ error: `No icon named "${product.icon}"` }, { status: 400 });
   }
 
-  // Validate icon exists server-side (not just the regex check in isLogoProduct)
-  if (obj['type'] !== 'text-only' && typeof obj['icon'] === 'string' && !isKnownIcon(obj['icon'])) {
-    return Response.json({ error: 'Unknown icon' }, { status: 400 });
-  }
-
-  const rawExports = obj['exports'];
+  const rawExports = (parsed.data as Record<string, unknown>)['exports'];
   let selectedPresets: SizePreset[];
 
   if (rawExports === undefined) {
@@ -69,7 +64,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const product = obj as unknown as LogoProduct;
     const { optimizedSvg } = await generateProduct(product);
     const slug = sanitizeSlug(product.name);
     const background = letterboxColor(product);
