@@ -92,8 +92,32 @@ cold start a user-visible number, which is why the build is `output: 'standalone
 
 ```bash
 rsync -a --exclude node_modules --exclude .next --exclude .git ./ ash:/opt/logo-kit/
-ssh ash 'cd /opt/logo-kit && npm ci --omit=dev && npm run build'
+ssh ash 'cd /opt/logo-kit && npm ci && npm run build'
 ```
+
+The units are generated, never hand-edited — regenerate them if the start command
+changes:
+
+```bash
+sudo zerofy --name logo-kit \
+  --exec '/usr/bin/env PORT=8215 HOSTNAME=127.0.0.1 \
+          NODE_COMPILE_CACHE=/var/cache/logo-kit/nodecc \
+          /usr/bin/node /opt/logo-kit/.next/standalone/server.js' \
+  --dir /opt/logo-kit --user www-data \
+  --front 127.0.0.1:8115 --back 8215 --idle 300s --apply
+```
+
+`NODE_COMPILE_CACHE` is the single biggest cold-start lever here: it persists V8's
+compiled bytecode for Next's server modules across process deaths, which is exactly
+the workload scale-to-zero creates. Node invalidates entries by content hash, so a
+redeploy does not need the cache cleared. Measured on the box, `next start` off a
+full `node_modules` -> standalone -> standalone plus compile cache:
+
+| | cold | warm |
+|---|---|---|
+| `next start`, 608 MB `node_modules` | 0.64–0.72 s | 4–7 ms |
+| standalone (46 MB traced) | 0.61–0.65 s | 4–5 ms |
+| standalone + compile cache | 0.52–0.55 s | 4–6 ms |
 
 The icon set is read off disk by name at runtime, so `next build` cannot trace it —
 `outputFileTracingIncludes` in `next.config.js` pulls `lucide-static/icons` into the
