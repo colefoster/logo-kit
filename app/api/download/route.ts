@@ -66,7 +66,6 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const { optimizedSvg } = await generateProduct(product);
     const slug = sanitizeSlug(product.name);
-    const background = letterboxColor(product);
 
     // Several presets share dimensions (app-icon-512 and logo-4x are both 512x512),
     // and rasterizing 512px twice on a small box is pure waste. Key by the render
@@ -91,8 +90,12 @@ export async function POST(req: Request): Promise<Response> {
         if (preset.format === 'ico') {
           return { filename, data: await render('ico', () => generateIco(optimizedSvg)) };
         }
+        // Square presets keep their transparency; only the wide social card is
+        // flattened, so it does not ship with transparent corner notches.
+        const flattenTo =
+          preset.width === preset.height ? undefined : letterboxColor(product);
         const data = await render(`png:${preset.width}x${preset.height}`, () =>
-          rasterizeSvg(optimizedSvg, preset.width, preset.height, background),
+          rasterizeSvg(optimizedSvg, preset.width, preset.height, { flattenTo }),
         );
         return { filename, data };
       },
