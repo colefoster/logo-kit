@@ -13,12 +13,12 @@ npm install
 ## Run
 
 ```bash
-npm run dev      # http://localhost:3000
-npm run build
-npm test         # 58 vitest tests
+npm run dev        # http://localhost:3000
+npm run build      # next build + copy static assets into .next/standalone
+npm start          # serves the standalone build; honours PORT and HOSTNAME
+npm test           # 88 vitest tests
+npm run typecheck
 ```
-
-Note: `npm start` is `node server.js`, and there is no `server.js` in the repo — that script is broken. Use `npm run dev`, or `npx next start` after a build.
 
 ## What you put in
 
@@ -51,7 +51,7 @@ Ten presets, each individually checkable. The default selection is the first fou
 
 **Delivery is a single ZIP**, streamed from `/api/download` — never individual file downloads. Everything sits under a `{slug}/` folder, where the slug is the product name lowercased with non-`[a-z0-9-]` characters replaced by `-`. Alongside the images the ZIP contains `manifest.html`: the `<link rel="icon">`, `apple-touch-icon`, `og:image`, `application-name` and `theme-color` tags for exactly the presets you selected, pointing at `./`.
 
-The OG card is worth calling out — it is the same square logo resized to 1200×630, not a separate wide layout.
+The OG card is worth calling out — it is the same square logo, scaled to fit 1200×630 and letterboxed with the logo's own colour, not a separate wide layout. It is the one export that gets flattened to fully opaque; square presets keep their alpha so a favicon still has transparent corners.
 
 ## How it fits together
 
@@ -62,6 +62,8 @@ src/generate.ts   SVGO preset-default
 src/raster.ts     Sharp -> PNG
 src/ico.ts        writes the ICO container by hand (header + directory + PNGs)
 src/manifest.ts   the HTML snippet
+src/rate-limit.ts fixed-window buckets and client-IP resolution
+src/api-utils.ts  8 KB-capped JSON body parsing
 app/api/preview   POST product -> SVG
 app/api/download  POST product + selected presets -> streamed ZIP
 app/api/icons     GET the icon name list
@@ -74,8 +76,25 @@ app/api/icons     GET the icon name list
 - Icon names must match `/^[a-z0-9-]+$/` **and** exist in `lucide-static`, checked server-side before any file read.
 - All user strings are XML-escaped into the SVG and HTML-escaped into the manifest.
 - Request bodies are capped at 8 KB; rasterisation runs at most 3 wide per request.
-- `middleware.ts` rate-limits `/api/download` and `/api/preview` to 30 requests per minute per IP, in process memory — fine for one container, not for a horizontally scaled deploy.
+- `proxy.ts` rate-limits per IP in process memory, with separate budgets: 90/min for `/api/preview` (which fires once per debounced keystroke pause) and 12/min for `/api/download` (which does the Sharp work). Client identity comes from `cf-connecting-ip` first, since that is the one header the client cannot set. Fine for one process, not for a horizontally scaled deploy.
 
 ## Incomplete
 
 `LogoConfig` and `parseConfig()` in `src/config.ts` describe a `products` array for generating several logos from one config. Nothing imports them — the UI and both API routes handle exactly one product per request.
+
+## Production
+
+Deployed at **logo-kit.fostered.dev** behind nginx and a Cloudflare tunnel, with
+systemd socket activation for scale-to-zero: after 5 minutes idle the Node process
+exits, and the next request queues in the kernel backlog while it boots. That makes
+cold start a user-visible number, which is why the build is `output: 'standalone'` —
+46 MB of traced dependencies instead of a 450 MB `node_modules`.
+
+```bash
+rsync -a --exclude node_modules --exclude .next --exclude .git ./ ash:/opt/logo-kit/
+ssh ash 'cd /opt/logo-kit && npm ci --omit=dev && npm run build'
+```
+
+The icon set is read off disk by name at runtime, so `next build` cannot trace it —
+`outputFileTracingIncludes` in `next.config.js` pulls `lucide-static/icons` into the
+standalone output explicitly. Set `LUCIDE_ICONS_DIR` to override the lookup.
