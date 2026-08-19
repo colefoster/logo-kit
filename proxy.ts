@@ -3,7 +3,7 @@ import { LIMITS, type Bucket, checkRateLimit, clientIpFrom, routeClass } from '@
 
 const BUCKETS = new Map<string, Bucket>();
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const cls = routeClass(req.nextUrl.pathname);
   if (!cls) return NextResponse.next();
 
